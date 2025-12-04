@@ -134,9 +134,36 @@ button:hover{
 }
 
 #score{
-    margin-top:20px;
-    font-size:20px;
+    margin-top:12px;
+    font-size:18px;
     color:#00f2fe;
+}
+
+/* Timer UI */
+#timerWrap{
+    margin:10px auto 18px;
+    max-width:520px;
+    text-align:center;
+    opacity:0.9;
+}
+#timer{
+    font-size:18px;
+    margin-bottom:8px;
+}
+#bar{
+    height:8px;
+    width:100%;
+    background:rgba(255,255,255,0.18);
+    border-radius:999px;
+    overflow:hidden;
+}
+#bar > span{
+    display:block;
+    height:100%;
+    width:100%;
+    background:#00f2fe;
+    transform-origin:left center;
+    transition:width 0.2s linear;
 }
 
 @media(max-width:768px){
@@ -277,6 +304,12 @@ CTR & Website Performance
 
     <h2 id="question">Question</h2>
 
+    <!-- Timer -->
+    <div id="timerWrap">
+        <div id="timer">⏱️ Time left: <span id="time">10</span>s</div>
+        <div id="bar"><span id="barFill"></span></div>
+    </div>
+
     <button class="answer-btn" onclick="check(0)" id="a1"></button>
     <button class="answer-btn" onclick="check(1)" id="a2"></button>
 
@@ -318,11 +351,14 @@ function openQuiz(){
     document.getElementById("carousel").style.display = "none";
     document.querySelector(".controls").style.display = "none";
     document.getElementById("quiz").style.display = "block";
+    qIndex = 0;
+    score = 0;
+    document.getElementById("score").textContent = "Score: 0";
     load();
 }
 
-/* ✅ GAME LOGIC */
-let questions = [
+/* ✅ GAME LOGIC WITH 10s TIMER PER QUESTION */
+const questions = [
   {
     q: "1. What does CTR measure?",
     answers: [
@@ -367,33 +403,96 @@ let questions = [
 
 let qIndex = 0;
 let score = 0;
+let timeLeft = 10;
+let timerInterval = null;
+
+const timeEl = document.getElementById('time');
+const barFill = document.getElementById('barFill');
 
 function load(){
-  document.getElementById("question").innerHTML = questions[qIndex].q;
-  document.getElementById("a1").innerHTML = questions[qIndex].answers[0];
-  document.getElementById("a2").innerHTML = questions[qIndex].answers[1];
+  // Load Q + answers
+  document.getElementById("question").textContent = questions[qIndex].q;
+  document.getElementById("a1").textContent = questions[qIndex].answers[0];
+  document.getElementById("a2").textContent = questions[qIndex].answers[1];
+
+  // Reset and start timer
+  startTimer();
+}
+
+function startTimer(){
+  clearInterval(timerInterval);
+  timeLeft = 10;
+  timeEl.textContent = timeLeft;
+  barFill.style.width = "100%";
+
+  const totalMs = 10000;
+  const started = Date.now();
+
+  timerInterval = setInterval(()=>{
+    const elapsed = Date.now() - started;
+    const remaining = Math.max(0, totalMs - elapsed);
+    timeLeft = Math.ceil(remaining / 1000);
+    timeEl.textContent = timeLeft;
+
+    const pct = (remaining / totalMs) * 100;
+    barFill.style.width = pct + "%";
+
+    if(remaining <= 0){
+      clearInterval(timerInterval);
+      // Time's up -> treat as wrong and move on (no click)
+      nextQuestion({timedOut:true});
+    }
+  }, 100);
 }
 
 function check(choice){
-  if(choice === questions[qIndex].correct){
+  const isCorrect = (choice === questions[qIndex].correct);
+  nextQuestion({answered:true, correct:isCorrect});
+}
+
+function nextQuestion({answered=false, correct=false, timedOut=false} = {}){
+  clearInterval(timerInterval);
+
+  if(answered && correct){
     score++;
     alert("✅ Correct!");
-  }else{
+  }else if(timedOut){
+    alert("⏰ Time’s up!");
+  }else if(answered){
     alert("❌ Wrong!");
   }
 
   qIndex++;
 
   if(qIndex < questions.length){
+    document.getElementById("score").textContent = "Score: " + score;
     load();
   }else{
-    document.getElementById("quiz").innerHTML =
-      "<h2>🎉 Test Finished</h2><p>Your Score: " + score + " / 5</p>";
+    finishGame();
   }
-
-  document.getElementById("score").innerHTML = "Score: " + score;
 }
+
+function finishGame(){
+  clearInterval(timerInterval);
+  const quiz = document.getElementById("quiz");
+  quiz.innerHTML = `
+      <h2>🎉 Test Finished</h2>
+      <p>Your Score: ${score} / ${questions.length}</p>
+      <button class="answer-btn" onclick="goToConclusion()">Next →</button>
+  `;
+}
+
+function goToConclusion(){
+  // Hide quiz, show slides, jump to conclusion (last slide)
+  document.getElementById("quiz").style.display = "none";
+  document.getElementById("carousel").style.display = "flex";
+  document.querySelector(".controls").style.display = "flex";
+  index = totalSlides - 1; // conclusion slide
+  carousel.style.transform = "translateX(" + (-index * 100) + "%)";
+}
+
 </script>
 
 </body>
 </html>
+```
